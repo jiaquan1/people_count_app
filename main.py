@@ -113,15 +113,13 @@ def performance_counts(perf_count):
     
     
 ###access the data in the scene
-def assess_scene(a, start,duration,t,personexist,prob_threshold):        
+def assess_scene(a,personexist,prob_threshold):        
         movingrange = sum(a)/20
-        if movingrange >prob_threshold and personexist == False:                     
-            start = t
+        if movingrange >prob_threshold and personexist == False:                                 
             personexist = True            
-        elif movingrange<prob_threshold and personexist == True:
-            duration=(t-start)/10
+        elif movingrange<prob_threshold and personexist == True:            
             personexist = False            
-        return start,duration,personexist
+        return personexist
 
 def draw_boxes(personexist,frame, result, args,width, height):
     '''
@@ -188,7 +186,8 @@ def infer_on_stream(args, client):
        
     ### TODO: Loop until stream is over ###
     a=collections.deque([0 for _ in range(20)])
-    b=np.array([0,0])
+#    b=np.array([0])
+#    infer_start = time.time()
     while cap.isOpened():
        
         ### TODO: Read from the video capture ###
@@ -204,22 +203,24 @@ def infer_on_stream(args, client):
         p_frame = p_frame.reshape(1, *p_frame.shape)
 
         ### TODO: Start asynchronous inference for specified request ###
-        infer_start = time.time()
+#        infer_start = time.time()
         infer_network.exec_net(p_frame)
         ### TODO: Wait for the result ###
         if infer_network.wait() == 0:
-            det_time = time.time() - infer_start
+#            det_time = time.time() - infer_start
             ### TODO: Get the results of the inference request ###
             result = infer_network.get_output()
             confidence = result[0][0][0][2]
             a.append(confidence)
             a.popleft()
-            if args.perf_counts:
-                perf_count = infer_network.performance_counter()
-                performance_counts(perf_count)
+#            b=np.append(b,[confidence],axis = 0)
+            
+#             if args.perf_counts:
+#                 perf_count = infer_network.performance_counter()
+#                 performance_counts(perf_count)
             
             ### TODO: Extract any desired stats from the results ###
-            start,duration,personexist = assess_scene(a, start,duration,t,personexist,prob_threshold) 
+            personexist = assess_scene(a,personexist,prob_threshold) 
             frame,current_count = draw_boxes(personexist,frame,result,args, width, height)
 #             ### TODO: Calculate and send relevant information on ###
 #             ### current_count, total_count and duration to the MQTT server ###
@@ -227,16 +228,16 @@ def infer_on_stream(args, client):
 #             ### Topic "person/duration": key of "duration" ###
             # When new person enters the video
             if current_count > last_count:
-                start_time = time.time()
-                total_count = total_count + current_count - last_count
-                client.publish("person", json.dumps({"total": total_count}))
+                 start_time = time.time()
+                 total_count = total_count + current_count - last_count
+                 client.publish("person", json.dumps({"total": total_count}))
 
             # Person duration in the video is calculated
             if current_count < last_count:
-                duration = int(time.time() - start_time)
-                # Publish messages to the MQTT server
-                client.publish("person/duration",
-                               json.dumps({"duration": duration}))
+                 duration = int(time.time() - start_time)
+                 # Publish messages to the MQTT server
+                 client.publish("person/duration",
+                                json.dumps({"duration": duration}))
 
             client.publish("person", json.dumps({"count": current_count}))
             last_count = current_count
@@ -252,8 +253,12 @@ def infer_on_stream(args, client):
             
         ### TODO: Write an output image if `single_image_mode` ###
         if image_flag:
-            cv2.imwrite('output_image.jpg',frame)   
-            
+            cv2.imwrite('output_image.jpg',frame) 
+    ### output all confidence values in foo.csv
+#    np.savetxt("foo.csv", b, delimiter=",")
+    ### output the inference time
+#    det_time = time.time() - infer_start
+#    print("infer time of this model:{:.2f}s".format(det_time))
     cap.release()
     cv2.destroyAllWindows()
     ### TODO: Disconnect from MQTT
