@@ -88,20 +88,26 @@ The inference time of the model pre- and post-conversion was compared directly u
 model	size	time
 ssd_mobilenet_v2_coco_2018_03_29	200MB	184.78s
 pedestrian-detection-adas-binary-0001	2.33MB	137.75s
+After performing frame dropping on models, both model could provide correct result. For ssd_mobilenet_v2_coco_2018_03_29, the threshold is 0.15. Raising the threshold will result in false positive (more than actual people would be counted). And for intel model, the threshold is 0.8. Lowering the threshold will result in false positive. And when observing the bounding box on the frame, the bounding box in ssd model is more stable from frame to frame, while the bounding box in intel model jumps from frame to frame.
+If the use case is to control the population in a confined space (shopping mall, theater), false positive is safer, I would select ssd_mobilenet_v2_coco_2018_03_29 with a little higher threshold. The size of the model should not be a problem for such case, since large device could be used in those cases. 
+If the use case is home camera monitoring or outdoor monitoring, where only small devices are available, I would select intel model due to the size of the model and the accuracy. 
 
 
 ## Assess Model Use Cases
 
 Some of the potential use cases of the people counter app are 
-1. controlling the population of people in public environment, such as malls, shopping centers, during pandemic;
-2. determine the business strategy(resources distribution at different time period and business units) based on the peak time of population and duration for a special business, such as hotel registartion, resturants; 
+1. controlling the population of people in confined space, such as malls, shopping centers, during pandemic; one app at the entrance and one app at the exit could provide how many people are inside the space. If the population inside reach the limit, no new person is allowed to enter. 
+2. determine the business strategy(resources distribution at different time period and business units) based on the peak time of population and duration for a special business, such as hotel registration, resturants; for example in a full service hotel, one app at the registration area could tell guests like to registrate around 4pm and one app at the dinning area could tell guest like to come to dinner at 6pm. With those information, the hotel could have more people work in registration table from 4pm to 6pm and those people could start to work in the dinning module after 6pm.
 
 Each of these use cases would be useful because this app provide in-situ statistic number of people through a physical space. It provides information about how many people in/out the space. Those information could be used to direct control the population, aslo could be used to determine how much resources should be invested to serve those people in a certain time and certain business unit.
 
 ## Assess Effects on End User Needs
 
 Lighting, model accuracy, and camera focal length/image size have different effects on a
-deployed edge model. The potential effects of each of these are as follows...
+deployed edge model. The potential effects of each of these are as follows:
+	• Poor lighting will result in dramatical failure regarding model's accuracy or even unusable. However, pre-process image of each frame (such as normalizing the image) with proper brightness/contrast adjustment could resolve this before passing it to the model.
+	• Model accuracy natural decreasing during conversion or other stages may make the model unusable if the doesn't perform the required task such as detecting risk of crimes as mentioned above in use-cases. A effective solution to this would be to put the model into validation mode for an hour or so. During this time the various devices could perform federated learning to give better performance. This might drastically provide a better performance.
+camera focal length/image size will affect the model because the model may fail to make sense of the input and the distored input may not be detected properly by the model. An approach to solve this would be to use similar images(similar focal length and image size) while training models  for use cases and specifying the threshold skews, this could be a potential solution. If use cases changes over time, the model needs to be training again. 
 
 ## Model Research
 
@@ -135,5 +141,6 @@ I get this model by
   - I converted the model to an Intermediate Representation with the following arguments
   python /opt/intel/openvino/deployment_tools/model_optimizer/mo.py --input_model frozen_inference_graph.pb --tensorflow_object_detection_api_pipeline_config pipeline.config --reverse_input_channels --tensorflow_use_custom_operations_config /opt/intel/openvino/deployment_tools/model_optimizer/extensions/front/tf/ssd_v2_support.json
   - The model was insufficient at the begining because there are some false negative in the middle of the video. I tried to improve this model by filtering out some false negative. I outputed the confidence of each frame in  and saved in frozen_inference_graph.xlsx. Actually this one works after taking 20 frames moving average confidence and use 0.04 as the threshold. It could detect exactly 6 peolpe in this video and output the correct duration for each person. But theshold 0.04 is kind of too low for a general cases. This model won't work for other videos. 
+  To improve this model, I took the last 20 frame confidence, drop 15 smallest, only use 5 highest confidence value to determine the status. After performing frame dropping on models, model could provide correct result with the threshold 0.15. Raising the threshold will result in false positive (more than actual people would be counted). The new confidence was saved in confidence after framedroping for frozen model.xlsx.
   
   

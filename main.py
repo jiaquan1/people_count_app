@@ -114,7 +114,7 @@ def performance_counts(perf_count):
     
 ###access the data in the scene
 def assess_scene(a,personexist,prob_threshold):        
-        movingrange = sum(a)/20
+        movingrange = a
         if movingrange >prob_threshold and personexist == False:                                 
             personexist = True            
         elif movingrange<prob_threshold and personexist == True:            
@@ -150,10 +150,10 @@ def infer_on_stream(args, client):
     infer_network = Network()
     # Set Probability threshold for detections
     prob_threshold = args.prob_threshold
-
+    request_id=0
     ### TODO: Load the model through `infer_network` ###
-    infer_network.load_model(args.model, args.device, CPU_EXTENSION) 
-    net_input_shape = infer_network.get_input_shape()
+    infer_network.load_model(args.model, request_id,args.device, CPU_EXTENSION) 
+    net_input_shape = infer_network.get_input_shape(request_id)
     
     ### TODO: Handle the input stream ###
     image_flag = False
@@ -162,6 +162,8 @@ def infer_on_stream(args, client):
         args.input = 0
     elif args.input.endswith('.jpg') or args.input.endswith('.bmp'):
         image_flag = True
+        input_stream = args.input
+    elif args.input.endswith('.mp4') or args.input.endswith('.avi'):
         input_stream = args.input
     else:
         input_stream = args.input
@@ -186,7 +188,8 @@ def infer_on_stream(args, client):
        
     ### TODO: Loop until stream is over ###
     a=collections.deque([0 for _ in range(20)])
-#    b=np.array([0])
+    b=np.array([0])
+    c=np.array([0])
 #    infer_start = time.time()
     while cap.isOpened():
        
@@ -204,23 +207,31 @@ def infer_on_stream(args, client):
 
         ### TODO: Start asynchronous inference for specified request ###
 #        infer_start = time.time()
-        infer_network.exec_net(p_frame)
+        infer_network.exec_net(request_id,p_frame)
         ### TODO: Wait for the result ###
-        if infer_network.wait() == 0:
+        if infer_network.wait(request_id) == 0:
 #            det_time = time.time() - infer_start
             ### TODO: Get the results of the inference request ###
-            result = infer_network.get_output()
+            result = infer_network.get_output(request_id)
             confidence = result[0][0][0][2]
-            a.append(confidence)
-            a.popleft()
-#            b=np.append(b,[confidence],axis = 0)
+#             a.append(confidence)
+#             a.popleft()
+            b=np.append(b,[confidence],axis = 0)
+    ### take the last 20 frame confidence, drop 15 smallest, only use 5 highest confidence value to determine the status
+            newa = b[-20:]
+            newb = sorted(newa,reverse = True)
+            newc = newb[:5]
+            new = sum(newc)/5
             
+#            c=np.append(c,[new],axis = 0)
+#             print(b,c)
+#             pdb.set_trace()
 #             if args.perf_counts:
 #                 perf_count = infer_network.performance_counter()
 #                 performance_counts(perf_count)
             
             ### TODO: Extract any desired stats from the results ###
-            personexist = assess_scene(a,personexist,prob_threshold) 
+            personexist = assess_scene(new,personexist,prob_threshold) 
             frame,current_count = draw_boxes(personexist,frame,result,args, width, height)
 #             ### TODO: Calculate and send relevant information on ###
 #             ### current_count, total_count and duration to the MQTT server ###
@@ -255,7 +266,8 @@ def infer_on_stream(args, client):
         if image_flag:
             cv2.imwrite('output_image.jpg',frame) 
     ### output all confidence values in foo.csv
-#    np.savetxt("foo.csv", b, delimiter=",")
+#    np.savetxt("b.csv",b,delimiter=",")
+#    np.savetxt("pre.csv", c, delimiter=",")
     ### output the inference time
 #    det_time = time.time() - infer_start
 #    print("infer time of this model:{:.2f}s".format(det_time))

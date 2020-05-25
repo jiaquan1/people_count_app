@@ -42,7 +42,7 @@ class Network:
         self.exec_network = None
         self.infer_request = None
         
-    def load_model(self, model, device="CPU", cpu_extension=None):
+    def load_model(self, model, request_id,device="CPU", cpu_extension=None):
         
         self.plugin = IECore()
         ### TODO: Load the model ###
@@ -69,12 +69,12 @@ class Network:
         self.output_blob = next(iter(self.network.outputs))
         return
 
-    def get_input_shape(self):
+    def get_input_shape(self,request_id):
         
         ### TODO: Return the shape of the input layer ###
         return self.network.inputs[self.input_blob].shape
 
-    def exec_net(self, image):
+    def exec_net(self,request_id, image):
         ### TODO: Start an asynchronous request ###
         ### TODO: Return any necessary information ###
         ### Note: You may need to update the function parameters. ###
@@ -82,14 +82,14 @@ class Network:
             inputs={self.input_blob: image})
         return
 
-    def wait(self):
+    def wait(self,request_id):
         ### TODO: Wait for the request to be complete. ###
         ### TODO: Return any necessary information ###
         ### Note: You may need to update the function parameters. ###
         status = self.exec_network.requests[0].wait(-1)
         return status
 
-    def get_output(self):
+    def get_output(self,request_id):
         ### TODO: Extract and return the output results
         ### Note: You may need to update the function parameters. ###
         return self.exec_network.requests[0].outputs[self.output_blob]
